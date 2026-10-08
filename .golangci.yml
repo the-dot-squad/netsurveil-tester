@@ -1,0 +1,42 @@
+version: "2"
+
+run:
+  build-tags: [e2e]
+
+linters:
+  enable:
+    - bodyclose
+    - errorlint
+    - gosec
+    - misspell
+    - noctx
+    - nolintlint
+    - revive
+    - unconvert
+    - unparam
+    - usestdlibvars
+  settings:
+    gosec:
+      excludes:
+        - G104 # unchecked errors are errcheck's job
+        - G115 # integer conversions are bounds-checked where they matter
+        - G404 # math/rand only jitters timing and ports; secrets use crypto/rand
+    revive:
+      rules:
+        - name: exported
+          disabled: true
+        - name: package-comments
+          disabled: true
+  exclusions:
+    presets: [std-error-handling]
+    rules:
+      - path: _test\.go
+        linters: [gosec, noctx, bodyclose, unparam]
+      - path: test/
+        linters: [gosec, noctx]
+
+formatters:
+  enable: [gofmt, goimports]
+  settings:
+    goimports:
+      local-prefixes: [github.com/the-dot-squad/netsurveil-tester]

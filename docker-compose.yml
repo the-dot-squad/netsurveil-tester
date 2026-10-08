@@ -1,0 +1,31 @@
+# Hybrid node: answers direct requests on NODE_PORT and, when FEED_URLS is
+# set, also pulls requests from its S3 feed.
+#   cp .env.example .env   # set NODE_ID, NODE_SECRET (openssl rand -base64 32), FEED_URLS
+#   docker compose up -d
+
+services:
+  nst-node:
+    image: ghcr.io/the-dot-squad/netsurveil-tester:0.1.0 # x-release-please-version
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [NET_RAW]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 128m
+    pids_limit: 128
+    restart: unless-stopped
+    stop_grace_period: 30s
+    ports:
+      - "${NODE_PORT:-8080}:8080"
+    environment:
+      NODE_ID: ${NODE_ID:-}
+      NODE_SECRET: ${NODE_SECRET:-}
+      FEED_URLS: ${FEED_URLS:-}
+      HTTP_PATH_PREFIX: ${HTTP_PATH_PREFIX:-}
+      RATE_LIMIT_PER_MIN: ${RATE_LIMIT_PER_MIN:-30}
+      ALLOW_PRIVATE_TARGETS: ${ALLOW_PRIVATE_TARGETS:-false}
+      LOG_LEVEL: ${LOG_LEVEL:-warn}
+    logging:
+      driver: json-file
+      options:
+        max-size: "1m"
+        max-file: "2"

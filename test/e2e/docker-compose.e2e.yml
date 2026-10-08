@@ -1,0 +1,74 @@
+# Simulated censored network. Run with: make e2e
+#
+# The network is internal: nothing reaches or leaves the host, so running the
+# suite produces no external traffic.
+#
+#   dnsd       172.30.0.10  ISP resolver (:53, sinkholes/hijacks) and clean control (:5353)
+#   targetsrv  172.30.0.20  upstream for every scenario
+#   nst-node   172.30.0.30  node under test; censor shares its network namespace
+#   e2e        172.30.0.50  test runner (controller), also hosts an in-memory bucket on :8090
+
+networks:
+  e2e:
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+
+services:
+  dnsd:
+    image: coredns/coredns:1.12.1
+    command: ["-conf", "/Corefile"]
+    volumes:
+      - ./Corefile:/Corefile:ro
+    networks:
+      e2e: { ipv4_address: 172.30.0.10 }
+
+  targetsrv:
+    build: { context: ../.., dockerfile: test/e2e/Dockerfile, target: targetsrv }
+    networks:
+      e2e: { ipv4_address: 172.30.0.20 }
+
+  # The production service (hardening and limits) built from this checkout.
+  nst-node:
+    extends: { file: ../../docker-compose.yml, service: nst-node }
+    build: { context: ../.. }
+    image: nst-node:e2e
+    restart: "no"
+    ports: !reset []
+    dns: [172.30.0.10]
+    environment:
+      NODE_ID: e2e-node
+      NODE_SECRET: "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
+      FEED_URLS: http://172.30.0.50:8090/netsurveil/feeds/e2e.txt
+      ALLOW_PRIVATE_TARGETS: "true"
+      RATE_LIMIT_PER_MIN: "100000"
+      LOG_LEVEL: debug
+    depends_on: [dnsd, targetsrv]
+    networks:
+      e2e: { ipv4_address: 172.30.0.30 }
+
+  censor:
+    build: { context: ../.., dockerfile: test/e2e/Dockerfile, target: censor }
+    network_mode: service:nst-node
+    cap_add: [NET_ADMIN]
+    depends_on: [nst-node]
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/ready"]
+      interval: 1s
+      retries: 30
+
+  e2e:
+    build: { context: ../.., dockerfile: test/e2e/Dockerfile, target: e2e }
+    environment:
+      NST_NODE_ID: e2e-node
+      NST_SECRET: "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
+      NST_NODE_URL: http://172.30.0.30:8080
+      NST_BUCKET_LISTEN: ":8090"
+      NST_BUCKET_URL: http://172.30.0.50:8090
+    depends_on:
+      censor: { condition: service_healthy }
+      # Pull-mode health: the image's HEALTHCHECK probes the loopback health listener.
+      nst-node: { condition: service_healthy }
+    networks:
+      e2e: { ipv4_address: 172.30.0.50 }

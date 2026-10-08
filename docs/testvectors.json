@@ -1,0 +1,26 @@
+[
+  {
+    "name": "request-submit",
+    "secret_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    "node_id": "node-1",
+    "direction": "req",
+    "ts": 1800000000,
+    "nonce_b64": "oKGio6SlpqeoqaqrrK2ur7CxsrO0tba3",
+    "plaintext": "{\"rid\":\"r1\",\"op\":\"submit\",\"checks\":[{\"type\":\"web\",\"target\":\"https://x.com\"}],\"reply\":[\"https://s3.eu-west-1.amazonaws.com/netsurveil/results/node-1/r1.json?X-Amz-Signature=00\"]}",
+    "aad": "nst/v1|node-1|req|1800000000",
+    "envelope": "{\"v\":1,\"node\":\"node-1\",\"ts\":1800000000,\"nonce\":\"oKGio6SlpqeoqaqrrK2ur7CxsrO0tba3\",\"ct\":\"NqCuiCDG3/Gz8Zk0UtrKa6gBq5SdWDR4BNiWFWmCDCR5snlkMcVqsTTnb+XPjjnUBXP0HDU9sGBY51emkjPTq8W7mMkGRGkYxO/duGdScoGJN+cMIEauS2ONNk/zT9MyGIgAyPQRsw7pviHIOxKd1q/NTKBGtGksKqoG9XD9PRY2iI45qp9ttQhOcWJlziSVb+kluXHsLDHRmbwyC5ShP9KUoi0KgtNmJsJ2xor3Alu5QT0NoyYK9xo57XqhudlfBA==\"}",
+    "derived_key_hex": "a64816171bd263fd070d0d4819a53e1adb0f64dd9e3dd2892649cee9bccba0f2"
+  },
+  {
+    "name": "response-error",
+    "secret_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    "node_id": "node-1",
+    "direction": "resp",
+    "ts": 1800000000,
+    "nonce_b64": "oKGio6SlpqeoqaqrrK2ur7CxsrO0tba3",
+    "plaintext": "{\"rid\":\"r1\",\"node\":\"node-1\",\"version\":\"dev\",\"error\":\"unknown job\"}",
+    "aad": "nst/v1|node-1|resp|1800000000",
+    "envelope": "{\"v\":1,\"node\":\"node-1\",\"ts\":1800000000,\"nonce\":\"oKGio6SlpqeoqaqrrK2ur7CxsrO0tba3\",\"ct\":\"WrIWF4WFFrYi54XSsYgzbL7FBRU4bPH9P7jdCaVt0ZSn/Fgy6nvxMDU8G+IQZ7KWNIMSSNqgLJ2NrrdzW09al0X51aYhmUB9voHqFzWcZpxFVg==\"}",
+    "derived_key_hex": "b5b8d168b9a9a8000050431d2a5044365d650e1ed126525c38d16563ed33887e"
+  }
+]

@@ -1,0 +1,21 @@
+# :53 is the node's "ISP" resolver: it sinkholes blocked.test and hijacks
+# nx.test with NXDOMAIN although the name exists (see :5353).
+test:53 {
+    template ANY ANY {
+        match "^nx\.test\.$"
+        rcode NXDOMAIN
+        authority "test. 60 IN SOA ns.test. hostmaster.test. 1 60 60 60 60"
+        fallthrough
+    }
+    hosts {
+        10.10.34.34 blocked.test
+        172.30.0.20 allowed.test blocked-sni.test
+    }
+}
+
+# :5353 is the uncensored control: every .test name is the real server.
+test:5353 {
+    template IN A {
+        answer "{{ .Name }} 60 IN A 172.30.0.20"
+    }
+}
