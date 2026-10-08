@@ -201,7 +201,8 @@ in `docker-compose.yml`. Merging that PR tags the release, and
   `:latest` for linux/amd64 and linux/arm64, with an SBOM and build provenance,
   signed keylessly with cosign;
 - attaches `nst-node` archives for linux/amd64 and linux/arm64, `SHA256SUMS`,
-  `install.sh`, `docker-compose.yml` and `.env.example` to the GitHub release.
+  `install.sh`, `docker-compose.yml` and `env.example` (save it as `.env`) to
+  the GitHub release.
 
 Verify an image with:
 
