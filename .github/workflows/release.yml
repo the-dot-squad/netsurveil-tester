@@ -110,7 +110,8 @@ jobs:
             tar -C bin -czf "dist/nst-node_${TAG}_linux_${arch}.tar.gz" nst-node
           done
           (cd dist && sha256sum -- *.tar.gz > SHA256SUMS)
-          cp install.sh docker-compose.yml .env.example dist/
+          cp install.sh docker-compose.yml dist/
+          cp .env.example dist/env.example
       - name: Upload to the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
