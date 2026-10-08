@@ -160,7 +160,8 @@ func (r *Runner) Run(ctx context.Context, s Spec) (res Result) {
 		res.Verdict, res.Error = Error, err.Error()
 		return res
 	}
-	cctx, cancel := context.WithTimeout(ctx, timeout)
+	deadline := time.Now().Add(timeout)
+	cctx, cancel := context.WithDeadline(ctx, deadline)
 	defer cancel()
 
 	out := exec(cctx)
@@ -168,7 +169,9 @@ func (r *Runner) Run(ctx context.Context, s Spec) (res Result) {
 	switch {
 	case ctx.Err() != nil:
 		res.Verdict, res.Mechanism, res.Error = Error, "cancelled", "check cancelled"
-	case cctx.Err() != nil:
+	// A socket deadline derived from cctx can fire before cctx's own timer
+	// marks it done, so cctx.Err() alone may still be nil here.
+	case cctx.Err() != nil || !time.Now().Before(deadline):
 		res.Verdict, res.Mechanism = Error, "check_timeout"
 		res.Error = fmt.Sprintf("check did not finish within %ds", int(timeout/time.Second))
 	}
