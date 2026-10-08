@@ -211,12 +211,6 @@ cosign verify ghcr.io/the-dot-squad/netsurveil-tester:<version> \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 
-release-please needs **Settings → Actions → General → Allow GitHub Actions to
-create and approve pull requests** enabled.
-Release PRs opened with the default `GITHUB_TOKEN` do not trigger CI. To get
-CI on them, add a `RELEASE_PLEASE_TOKEN` repository secret holding a
-fine-grained token with contents and pull-request write access.
-
 ## Documentation
 
 - [Protocol](docs/PROTOCOL.md): the encrypted envelope, both transports, the
