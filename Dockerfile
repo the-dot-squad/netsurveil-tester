@@ -1,6 +1,6 @@
 # NetSurveil firewall tester node.
 # Cross-compiles on the build host for every target platform (docker buildx).
-FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.27-alpine AS builder
 
 WORKDIR /src
 
