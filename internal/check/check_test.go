@@ -103,6 +103,25 @@ func TestRunOutOfBudget(t *testing.T) {
 	}
 }
 
+func TestRunOutOfBudgetAtIODeadline(t *testing.T) {
+	const name = "test-io-deadline"
+	registry[name] = definition{50 * time.Millisecond, 50 * time.Millisecond, func(*Env, string, json.RawMessage, time.Duration) (execFunc, error) {
+		return func(ctx context.Context) outcome {
+			deadline, _ := ctx.Deadline()
+			time.Sleep(time.Until(deadline))
+			return outcome{verdict: Blocked, mechanism: "tcp_timeout"}
+		}, nil
+	}}
+	t.Cleanup(func() { delete(registry, name) })
+
+	for range 50 {
+		res := testRunner().Run(context.Background(), Spec{Type: name})
+		if res.Verdict != Error || res.Mechanism != "check_timeout" {
+			t.Fatalf("got %s/%s, want error/check_timeout", res.Verdict, res.Mechanism)
+		}
+	}
+}
+
 func TestRunCancelled(t *testing.T) {
 	typ := withSlowCheck(t, time.Minute)
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
