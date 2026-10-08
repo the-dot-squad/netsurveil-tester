@@ -2,6 +2,8 @@ module github.com/the-dot-squad/netsurveil-tester
 
 go 1.26.0
 
+toolchain go1.26.8
+
 require (
 	github.com/quic-go/quic-go v0.63.0
 	github.com/refraction-networking/utls v1.8.2
