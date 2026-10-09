@@ -58,7 +58,9 @@ func LoadNode(getenv func(string) string) (Node, error) {
 		return cfg, fmt.Errorf("NODE_SECRET: %w", err)
 	}
 
-	cfg.ListenAddr = addrOrOff(getenv("LISTEN_ADDR"), ":8080")
+	if cfg.ListenAddr, err = listenAddr(getenv("LISTEN_ADDR"), getenv("NODE_PORT")); err != nil {
+		return cfg, err
+	}
 	cfg.HealthAddr = addrOrOff(getenv("HEALTH_ADDR"), DefaultHealthAddr)
 	if cfg.HealthAddr != "" {
 		host, _, err := net.SplitHostPort(cfg.HealthAddr)
@@ -85,7 +87,7 @@ func LoadNode(getenv func(string) string) (Node, error) {
 	}
 
 	if cfg.ListenAddr == "" && len(cfg.FeedURLs) == 0 {
-		return cfg, errors.New("nothing to do: set LISTEN_ADDR, FEED_URLS, or both")
+		return cfg, errors.New("nothing to do: enable NODE_PORT, set FEED_URLS, or both")
 	}
 
 	if cfg.AllowPrivate, err = parseBool(getenv("ALLOW_PRIVATE_TARGETS"), false); err != nil {
@@ -98,6 +100,25 @@ func LoadNode(getenv func(string) string) (Node, error) {
 		return cfg, fmt.Errorf("TRUSTED_PROXIES: %w", err)
 	}
 	return cfg, nil
+}
+
+// listenAddr picks the inbound listener: LISTEN_ADDR when set (an advanced
+// override for binding one interface), otherwise ":"+NODE_PORT, default
+// :8080. "off" in either disables inbound mode.
+func listenAddr(addr, port string) (string, error) {
+	if strings.TrimSpace(addr) != "" {
+		return addrOrOff(addr, ""), nil
+	}
+	switch port = strings.TrimSpace(port); port {
+	case "":
+		return ":8080", nil
+	case "off":
+		return "", nil
+	}
+	if n, err := strconv.Atoi(port); err != nil || n < 1 || n > 65535 {
+		return "", errors.New(`NODE_PORT must be a port number (1-65535) or "off"`)
+	}
+	return ":" + port, nil
 }
 
 // parsePrefixes splits a comma-separated list of IPs and CIDRs.

@@ -33,6 +33,26 @@ func TestLoadNodeOptionalAddrs(t *testing.T) {
 	}
 }
 
+func TestLoadNodeListenAddr(t *testing.T) {
+	cases := []struct{ listen, port, want string }{
+		{"", "", ":8080"},
+		{"", "80", ":80"},
+		{"", " 9000 ", ":9000"},
+		{"", "off", ""},
+		{"127.0.0.1:7000", "80", "127.0.0.1:7000"},
+		{"off", "80", ""},
+	}
+	for _, c := range cases {
+		cfg, err := LoadNode(env(map[string]string{
+			"NODE_ID": "n", "NODE_SECRET": testSecretHex, "FEED_URLS": "https://a/f.txt",
+			"LISTEN_ADDR": c.listen, "NODE_PORT": c.port,
+		}))
+		if err != nil || cfg.ListenAddr != c.want {
+			t.Errorf("LISTEN_ADDR=%q NODE_PORT=%q: got %q %v, want %q", c.listen, c.port, cfg.ListenAddr, err, c.want)
+		}
+	}
+}
+
 func TestLoadNodeTrustedProxies(t *testing.T) {
 	cfg, err := LoadNode(env(map[string]string{
 		"NODE_ID": "n", "NODE_SECRET": testSecretHex, "TRUSTED_PROXIES": " 10.0.0.0/8, ,192.0.2.7,::ffff:198.51.100.1,fd00::/8 ",
@@ -56,6 +76,11 @@ func TestLoadNodeRejects(t *testing.T) {
 		"bad id":        {"NODE_ID": "bad id", "NODE_SECRET": testSecretHex},
 		"short secret":  {"NODE_ID": "n", "NODE_SECRET": "abcd"},
 		"no mode":       {"NODE_ID": "n", "NODE_SECRET": testSecretHex, "LISTEN_ADDR": "off"},
+		"port off":      {"NODE_ID": "n", "NODE_SECRET": testSecretHex, "NODE_PORT": "off"},
+		"port name":     {"NODE_ID": "n", "NODE_SECRET": testSecretHex, "NODE_PORT": "http"},
+		"port zero":     {"NODE_ID": "n", "NODE_SECRET": testSecretHex, "NODE_PORT": "0"},
+		"port range":    {"NODE_ID": "n", "NODE_SECRET": testSecretHex, "NODE_PORT": "65536"},
+		"port addr":     {"NODE_ID": "n", "NODE_SECRET": testSecretHex, "NODE_PORT": ":80"},
 		"bad proxy":     {"NODE_ID": "n", "NODE_SECRET": testSecretHex, "TRUSTED_PROXIES": "proxy.local"},
 		"bad cidr":      {"NODE_ID": "n", "NODE_SECRET": testSecretHex, "TRUSTED_PROXIES": "10.0.0.0/33"},
 		"bad feed":      {"NODE_ID": "n", "NODE_SECRET": testSecretHex, "FEED_URLS": "ftp://x/feed.txt"},

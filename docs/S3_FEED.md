@@ -467,6 +467,6 @@ one or two for the result. Check your provider's current prices.
 - The S3 client presigns with `requestChecksumCalculation: "WHEN_REQUIRED"`.
 - The results lifecycle rule and the scheduled sweep are in place.
 - The node has `FEED_URLS` set. To stop it from also listening for direct
-  requests, set `LISTEN_ADDR=off` (and drop the `ports` mapping in compose).
+  requests, set `NODE_PORT=off` (and drop the `ports` mapping in compose).
 - Feed lines carry only `submit` requests; the node answers `get` and
   `cancel` lines with an error.
