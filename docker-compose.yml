@@ -5,7 +5,7 @@
 
 services:
   nst-node:
-    image: ghcr.io/the-dot-squad/netsurveil-tester:0.1.0 # x-release-please-version
+    image: ghcr.io/the-dot-squad/netsurveil-tester:0.1.1 # x-release-please-version
     read_only: true
     cap_drop: [ALL]
     cap_add: [NET_RAW]
