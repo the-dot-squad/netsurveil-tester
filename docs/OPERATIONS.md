@@ -68,7 +68,7 @@ Finally, register the node's address and secret on the website and run an
 | `HTTP_PATH_PREFIX`      | empty   | e.g. `/k3x9q`; every route lives under it |
 | `FEED_URLS`             | empty   | enables pull mode: up to 8 comma-separated URLs of the node's feed object, used in order as mirrors |
 | `ALLOW_PRIVATE_TARGETS` | `false` | allow RFC 1918, CGNAT and ULA targets (lab use only) |
-| `RATE_LIMIT_PER_MIN`    | `30`    | inbound requests per minute per client IP |
+| `RATE_LIMIT_PER_MIN`    | `30`    | rejected requests per minute per client IP; once exceeded, that client gets only empty 404s until the minute ends. Authenticated requests are never counted |
 | `LOG_LEVEL`             | `info` (`warn` in compose) | `debug`, `info`, `warn` or `error` (any case); anything else stops the node at startup. `debug` also logs why each request was rejected |
 
 At least one of direct and pull mode must be enabled. On `SIGTERM` the node
@@ -114,8 +114,9 @@ probes this endpoint.
   how much traffic it handles. To hide that, terminate TLS in a reverse proxy
   (such as Caddy) in front of the node.
 - **Behind a reverse proxy:** the node does not trust `X-Forwarded-For`, so
-  rate limiting applies per proxy IP. Raise `RATE_LIMIT_PER_MIN` to match, or
-  rate-limit at the proxy instead.
+  every caller shares the proxy's rate-limit bucket. This never blocks the
+  website, because only rejected requests are counted, but scanners then
+  share one budget; rate-limit at the proxy if that matters.
 - **Firewall:** if you know your controller IPs, allow inbound traffic only
   from them. The node needs only outbound access to the targets it tests.
 - **Clock:** requests are valid for ±120 s. Keep NTP running on node hosts and

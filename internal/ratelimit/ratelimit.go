@@ -1,4 +1,4 @@
-// Package ratelimit provides a fixed-window per-key request limiter.
+// Package ratelimit provides a fixed-window per-key event limiter.
 package ratelimit
 
 import (
@@ -52,6 +52,16 @@ func (l *Limiter) Allow(key string) bool {
 	}
 	w.count++
 	return w.count <= l.limit
+}
+
+// Exceeded reports whether key has used up its current window, without
+// recording an event.
+func (l *Limiter) Exceeded(key string) bool {
+	now := l.now()
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	w, ok := l.keys[key]
+	return ok && now.Sub(w.start) < l.period && w.count >= l.limit
 }
 
 // ClientIP returns the remote IP of r without trusting forwarding headers.

@@ -202,17 +202,29 @@ func TestNoFingerprint(t *testing.T) {
 	}
 }
 
-func TestRateLimitLooksLikeNotFound(t *testing.T) {
+func probe(t *testing.T, url string, rt http.RoundTripper) int {
+	t.Helper()
+	resp, err := (&http.Client{Transport: rt}).Get(url + "/wp-login.php")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	return resp.StatusCode
+}
+
+func TestRateLimitCountsOnlyRejections(t *testing.T) {
 	srv := httptest.NewServer(newService(t).Handler("", 2))
 	defer srv.Close()
 	c, _ := client.New(client.Config{NodeID: nodeID, Secret: secret, NodeURL: srv.URL})
-	var errs []string
-	for range 3 {
-		_, err := c.Status(context.Background(), "nope")
-		errs = append(errs, err.Error())
+	for i := range 5 {
+		if _, err := c.Status(context.Background(), "nope"); err == nil || !strings.Contains(err.Error(), "unknown job") {
+			t.Fatalf("authenticated request %d: %v", i+1, err)
+		}
 	}
-	if !strings.Contains(errs[1], "unknown job") || !strings.Contains(errs[2], "HTTP 404") {
-		t.Fatalf("errors %q", errs)
+	probe(t, srv.URL, nil)
+	probe(t, srv.URL, nil)
+	if _, err := c.Status(context.Background(), "nope"); err == nil || !strings.Contains(err.Error(), "HTTP 404") {
+		t.Fatalf("over the limit, the node must look closed: %v", err)
 	}
 }
 
