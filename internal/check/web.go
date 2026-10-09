@@ -119,7 +119,7 @@ func runWeb(ctx context.Context, env *Env, u *url.URL, o webOptions) outcome {
 		ip = lit.Unmap()
 	} else {
 		local := systemLookup(ctx, host, 0)
-		controls := runLookups(ctx, o.lookups(env, host, 0))
+		controls := raceControls(ctx, o.lookups(env, host, 0))
 		ev.DNS = append([]dnsAnswer{local}, controls...)
 		st := Stage{Name: "dns", OK: local.ok(), Ms: local.Ms, Error: local.Error}
 		if local.RCode == "NXDOMAIN" {

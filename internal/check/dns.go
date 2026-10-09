@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/net/dns/dnsmessage"
@@ -96,20 +97,22 @@ func prepareDNS(env *Env, target string, raw json.RawMessage, _ time.Duration) (
 				return udpLookup(ctx, env.Guard, ap, target, qtype, 4*time.Second)
 			})
 		}
-		controls := o.lookups(env, target, qtype)
-		all := append(append([]lookupFunc{}, local...), controls...)
 		if probe != nil {
-			all = append(all, func(ctx context.Context) dnsAnswer {
+			local = append(local, func(ctx context.Context) dnsAnswer {
 				a := udpLookup(ctx, env.Guard, *probe, target, qtype, 3*time.Second)
 				a.Source = "injection:" + probe.String()
 				return a
 			})
 		}
-		answers := runLookups(ctx, all)
+		var controls []dnsAnswer
+		var wg sync.WaitGroup
+		wg.Go(func() { controls = raceControls(ctx, o.lookups(env, target, qtype)) })
+		answers := runLookups(ctx, local)
+		wg.Wait()
 
-		ev := &dnsEvidence{QType: qtype.String()[4:], Local: answers[:len(local)], Control: answers[len(local) : len(local)+len(controls)]}
+		ev := &dnsEvidence{QType: qtype.String()[4:], Local: answers, Control: controls}
 		if probe != nil {
-			ev.Injection = &answers[len(answers)-1]
+			ev.Local, ev.Injection = answers[:len(answers)-1], &answers[len(answers)-1]
 		}
 		v, mech := judgeDNS(ev.Local, ev.Control, ev.Injection)
 		if mech == "dns_mismatch" && localAnswerHasValidCert(ctx, env, target, ev.Local) {
