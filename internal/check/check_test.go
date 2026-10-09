@@ -360,3 +360,53 @@ func TestPingSummarize(t *testing.T) {
 		t.Errorf("%s/%s", v, m)
 	}
 }
+
+func TestLookupPublicInfo(t *testing.T) {
+	ipinfoStatus := http.StatusOK
+	mux := http.NewServeMux()
+	mux.HandleFunc("/blocked", func(w http.ResponseWriter, r *http.Request) { <-r.Context().Done() })
+	mux.HandleFunc("/broken", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusBadGateway) })
+	mux.HandleFunc("/empty", func(w http.ResponseWriter, r *http.Request) { _, _ = io.WriteString(w, "fl=1\n") })
+	mux.HandleFunc("/trace", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, "fl=1\nip=203.0.113.9\nloc=IR\ncolo=FRA\n")
+	})
+	mux.HandleFunc("/ipinfo/203.0.113.9/json", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(ipinfoStatus)
+		_, _ = io.WriteString(w, `{"ip":"203.0.113.9","city":"Example City","country":"IR","org":"AS64500 EXAMPLE-NET"}`)
+	})
+	mux.HandleFunc("/ripe", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("resource") != "203.0.113.9" {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		_, _ = io.WriteString(w, `{"data":{"asns":[{"asn":64501,"holder":"EXAMPLE-AS"}]}}`)
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	u := func(p string) string { return srv.URL + p }
+	ipinfo, ripe := u("/ipinfo/"), u("/ripe?resource=")
+
+	start := time.Now()
+	ev := &infoEvidence{}
+	lookupPublicInfo(context.Background(), srv.Client(), ev, []string{u("/broken"), u("/blocked"), u("/empty"), u("/trace")}, ipinfo, ripe)
+	if time.Since(start) > 3*time.Second {
+		t.Fatal("the first good trace must end the race")
+	}
+	if ev.PublicIP != "203.0.113.9" || ev.PublicIPSource != u("/trace") || ev.Country != "IR" || ev.Colo != "FRA" ||
+		ev.City != "Example City" || ev.Org != "AS64500 EXAMPLE-NET" {
+		t.Fatalf("evidence %+v", ev)
+	}
+
+	ipinfoStatus = http.StatusTooManyRequests
+	ev = &infoEvidence{}
+	lookupPublicInfo(context.Background(), srv.Client(), ev, []string{u("/trace")}, ipinfo, ripe)
+	if ev.Org != "AS64501 EXAMPLE-AS" || len(ev.Errors) != 0 {
+		t.Fatalf("RIPEstat fallback: %+v", ev)
+	}
+
+	ev = &infoEvidence{}
+	lookupPublicInfo(context.Background(), srv.Client(), ev, []string{u("/broken"), u("/empty")}, ipinfo, ripe)
+	if ev.PublicIP != "" || len(ev.Errors) != 2 {
+		t.Fatalf("no trace answered: %+v", ev)
+	}
+}

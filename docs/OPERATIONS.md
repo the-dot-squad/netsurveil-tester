@@ -141,6 +141,11 @@ aim to make the node look like an ordinary host that browses the web.
 - HTTP fetches, DoH lookups and the info lookups send a current desktop browser
   `User-Agent`. The `web` check's TLS handshake and its HTTP request both
   present a Chrome TLS fingerprint.
+- `info` asks Cloudflare's trace endpoint for the public IP, racing
+  `1.1.1.1`, `1.0.0.1` and `www.cloudflare.com` so one blocked route does not
+  fail the check, then looks that IP up on `ipinfo.io` and RIPEstat
+  (`stat.ripe.net`). These are common destinations, but a periodic `info` run
+  is a regular pattern; schedule it no more often than you need.
 - `tcp` dials at most 3 ports at a time, with a random 50–250 ms pause before
   each dial. A batch of ports therefore doesn't look like a scan.
 - The `dns` injection probe, which sends a query to an IP that runs no DNS
