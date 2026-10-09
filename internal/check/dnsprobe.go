@@ -22,7 +22,7 @@ import (
 )
 
 // Uncensored resolvers addressed by IP so the control path does not depend on local DNS.
-var defaultDoH = []string{"https://1.1.1.1/dns-query", "https://8.8.8.8/dns-query"}
+var defaultDoH = []string{"https://1.1.1.1/dns-query", "https://8.8.8.8/dns-query", "https://9.9.9.9/dns-query"}
 
 // Answers that are never legitimate for a public name: national filtering
 // sinkholes (Iran 10.10.34.0/24) and null/loopback routes used by DNS blocklists.
@@ -112,6 +112,34 @@ func runLookups(ctx context.Context, fns []lookupFunc) []dnsAnswer {
 	var wg sync.WaitGroup
 	for i, fn := range fns {
 		wg.Go(func() { out[i] = fn(ctx) })
+	}
+	wg.Wait()
+	return out
+}
+
+// raceControls runs the control lookups at once and stops at the first usable
+// answer: one is enough to judge, and a blocked control would otherwise hold
+// the check until its timeout. Lookups cut short are marked "skipped".
+func raceControls(ctx context.Context, fns []lookupFunc) []dnsAnswer {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	out := make([]dnsAnswer, len(fns))
+	var mu sync.Mutex
+	won := false
+	var wg sync.WaitGroup
+	for i, fn := range fns {
+		wg.Go(func() {
+			a := fn(ctx)
+			mu.Lock()
+			defer mu.Unlock()
+			if won {
+				a = dnsAnswer{Source: a.Source, Error: "skipped", Ms: a.Ms}
+			} else if a.ok() {
+				won = true
+				cancel()
+			}
+			out[i] = a
+		})
 	}
 	wg.Wait()
 	return out

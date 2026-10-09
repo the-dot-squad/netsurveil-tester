@@ -263,7 +263,12 @@ Options must also fit within the timeout. For `tcp`, `ping`, `traceroute` and
 - `no_control`: disables the controls.
 
 When neither `control_resolvers` nor `doh` is given, the check uses Cloudflare
-(1.1.1.1) and Google (8.8.8.8) DoH, addressed by IP.
+(1.1.1.1), Google (8.8.8.8) and Quad9 (9.9.9.9) DoH, addressed by IP.
+
+Controls are queried at once and the first usable answer settles the
+comparison; the others are cancelled and reported with `"error": "skipped"`,
+so a blocked control does not delay the check. When no control answers,
+every control's own result is reported.
 
 ### Target policy
 

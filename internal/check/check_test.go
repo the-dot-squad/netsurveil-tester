@@ -361,6 +361,36 @@ func TestPingSummarize(t *testing.T) {
 	}
 }
 
+func TestRaceControls(t *testing.T) {
+	answer := func(src string, a dnsAnswer) lookupFunc {
+		return func(context.Context) dnsAnswer { a.Source = src; return a }
+	}
+	blocked := func(ctx context.Context) dnsAnswer {
+		<-ctx.Done()
+		a := dnsAnswer{Source: "blocked"}
+		a.fail(ctx.Err())
+		return a
+	}
+
+	start := time.Now()
+	got := raceControls(context.Background(), []lookupFunc{blocked, answer("good", dnsAnswer{RCode: "NOERROR", Addrs: []string{"192.0.2.1"}})})
+	if time.Since(start) > 2*time.Second {
+		t.Fatal("a usable answer must cut the blocked control short")
+	}
+	if got[0].Source != "blocked" || got[0].Error != "skipped" || got[0].timeout || !got[1].ok() {
+		t.Fatalf("race result %+v", got)
+	}
+
+	failing := []lookupFunc{
+		answer("nx", dnsAnswer{RCode: "NXDOMAIN"}),
+		answer("down", dnsAnswer{Error: "connection refused"}),
+	}
+	got = raceControls(context.Background(), failing)
+	if got[0].RCode != "NXDOMAIN" || got[1].Error != "connection refused" {
+		t.Fatalf("without a usable answer every result must be kept: %+v", got)
+	}
+}
+
 func TestLookupPublicInfo(t *testing.T) {
 	ipinfoStatus := http.StatusOK
 	mux := http.NewServeMux()
