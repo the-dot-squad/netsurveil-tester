@@ -33,11 +33,31 @@ func TestLoadNodeOptionalAddrs(t *testing.T) {
 	}
 }
 
+func TestLoadNodeTrustedProxies(t *testing.T) {
+	cfg, err := LoadNode(env(map[string]string{
+		"NODE_ID": "n", "NODE_SECRET": testSecretHex, "TRUSTED_PROXIES": " 10.0.0.0/8, ,192.0.2.7,::ffff:198.51.100.1,fd00::/8 ",
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"10.0.0.0/8", "192.0.2.7/32", "198.51.100.1/32", "fd00::/8"}
+	if len(cfg.TrustedProxies) != len(want) {
+		t.Fatalf("TrustedProxies = %v, want %v", cfg.TrustedProxies, want)
+	}
+	for i, p := range cfg.TrustedProxies {
+		if p.String() != want[i] {
+			t.Errorf("TrustedProxies[%d] = %s, want %s", i, p, want[i])
+		}
+	}
+}
+
 func TestLoadNodeRejects(t *testing.T) {
 	cases := map[string]map[string]string{
 		"bad id":        {"NODE_ID": "bad id", "NODE_SECRET": testSecretHex},
 		"short secret":  {"NODE_ID": "n", "NODE_SECRET": "abcd"},
 		"no mode":       {"NODE_ID": "n", "NODE_SECRET": testSecretHex, "LISTEN_ADDR": "off"},
+		"bad proxy":     {"NODE_ID": "n", "NODE_SECRET": testSecretHex, "TRUSTED_PROXIES": "proxy.local"},
+		"bad cidr":      {"NODE_ID": "n", "NODE_SECRET": testSecretHex, "TRUSTED_PROXIES": "10.0.0.0/33"},
 		"bad feed":      {"NODE_ID": "n", "NODE_SECRET": testSecretHex, "FEED_URLS": "ftp://x/feed.txt"},
 		"feed no path":  {"NODE_ID": "n", "NODE_SECRET": testSecretHex, "FEED_URLS": "https://s3.example"},
 		"feed dup":      {"NODE_ID": "n", "NODE_SECRET": testSecretHex, "FEED_URLS": "https://a/f.txt,https://a/f.txt"},

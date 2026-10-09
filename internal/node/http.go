@@ -29,11 +29,12 @@ type denyFunc func(w http.ResponseWriter, r *http.Request, reason string)
 //
 // perMinute bounds rejected requests per client; authenticated requests are
 // never counted, so scanning cannot lock out the controller even when both
-// arrive through the same proxy.
-func (s *Service) Handler(prefix string, perMinute int) http.Handler {
+// arrive through the same proxy. trusted lists the proxies whose
+// X-Forwarded-For identifies the client.
+func (s *Service) Handler(prefix string, perMinute int, trusted []netip.Prefix) http.Handler {
 	lim := ratelimit.New(perMinute, time.Minute)
 	deny := func(w http.ResponseWriter, r *http.Request, reason string) {
-		ip := ratelimit.ClientIP(r)
+		ip := ratelimit.ClientIP(r, trusted)
 		lim.Allow(ip)
 		s.log.Debug("request rejected", "reason", reason, "remote", ip, "method", r.Method)
 		notFound(w, r)
@@ -59,7 +60,7 @@ func (s *Service) Handler(prefix string, perMinute int) http.Handler {
 		}
 	})
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if lim.Exceeded(ratelimit.ClientIP(r)) {
+		if lim.Exceeded(ratelimit.ClientIP(r, trusted)) {
 			notFound(w, r)
 			return
 		}

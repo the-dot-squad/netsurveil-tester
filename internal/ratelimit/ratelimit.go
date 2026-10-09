@@ -4,6 +4,8 @@ package ratelimit
 import (
 	"net"
 	"net/http"
+	"net/netip"
+	"strings"
 	"sync"
 	"time"
 )
@@ -64,11 +66,38 @@ func (l *Limiter) Exceeded(key string) bool {
 	return ok && now.Sub(w.start) < l.period && w.count >= l.limit
 }
 
-// ClientIP returns the remote IP of r without trusting forwarding headers.
-func ClientIP(r *http.Request) string {
+// ClientIP returns the remote IP of r. X-Forwarded-For is consulted only when
+// the connection comes from a trusted proxy, and then read right to left up
+// to the first hop that is not itself trusted; entries further left are
+// client-supplied and could be forged.
+func ClientIP(r *http.Request, trusted []netip.Prefix) string {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
-		return r.RemoteAddr
+		host = r.RemoteAddr
+	}
+	ip, err := netip.ParseAddr(host)
+	if err != nil || !isTrusted(ip, trusted) {
+		return host
+	}
+	hops := strings.Split(strings.Join(r.Header.Values("X-Forwarded-For"), ","), ",")
+	for i := len(hops) - 1; i >= 0; i-- {
+		hop, err := netip.ParseAddr(strings.TrimSpace(hops[i]))
+		if err != nil {
+			return host
+		}
+		if !isTrusted(hop, trusted) {
+			return hop.Unmap().String()
+		}
 	}
 	return host
+}
+
+func isTrusted(ip netip.Addr, trusted []netip.Prefix) bool {
+	ip = ip.Unmap()
+	for _, p := range trusted {
+		if p.Contains(ip) {
+			return true
+		}
+	}
+	return false
 }

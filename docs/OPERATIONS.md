@@ -69,6 +69,7 @@ Finally, register the node's address and secret on the website and run an
 | `FEED_URLS`             | empty   | enables pull mode: up to 8 comma-separated URLs of the node's feed object, used in order as mirrors |
 | `ALLOW_PRIVATE_TARGETS` | `false` | allow RFC 1918, CGNAT and ULA targets (lab use only) |
 | `RATE_LIMIT_PER_MIN`    | `30`    | rejected requests per minute per client IP; once exceeded, that client gets only empty 404s until the minute ends. Authenticated requests are never counted |
+| `TRUSTED_PROXIES`       | empty   | comma-separated IPs or CIDRs of reverse proxies in front of the node; for connections from them, the client IP is taken from `X-Forwarded-For` |
 | `LOG_LEVEL`             | `info` (`warn` in compose) | `debug`, `info`, `warn` or `error` (any case); anything else stops the node at startup. `debug` also logs why each request was rejected |
 
 At least one of direct and pull mode must be enabled. On `SIGTERM` the node
@@ -113,10 +114,14 @@ probes this endpoint.
   show an on-path observer (the ISP) that the endpoint exists, its path, and
   how much traffic it handles. To hide that, terminate TLS in a reverse proxy
   (such as Caddy) in front of the node.
-- **Behind a reverse proxy:** the node does not trust `X-Forwarded-For`, so
-  every caller shares the proxy's rate-limit bucket. This never blocks the
-  website, because only rejected requests are counted, but scanners then
-  share one budget; rate-limit at the proxy if that matters.
+- **Behind a reverse proxy:** by default the node does not trust
+  `X-Forwarded-For`, so every caller shares the proxy's rate-limit bucket.
+  This never blocks the website, because only rejected requests are counted,
+  but scanners then share one budget. Set `TRUSTED_PROXIES` to the proxy's
+  address range (on Kubernetes-based platforms, typically the cluster range
+  such as `10.0.0.0/8`) to limit each real client separately. The node reads
+  `X-Forwarded-For` right to left and stops at the first untrusted hop, so a
+  client cannot forge its way past the limit.
 - **Firewall:** if you know your controller IPs, allow inbound traffic only
   from them. The node needs only outbound access to the targets it tests.
 - **Clock:** requests are valid for ±120 s. Keep NTP running on node hosts and

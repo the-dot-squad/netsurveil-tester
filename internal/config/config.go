@@ -39,7 +39,8 @@ type Node struct {
 	FeedURLs        []string // mirrors of the node's request feed; empty disables pull mode
 	AllowPrivate    bool
 	RateLimitPerMin int
-	LogLevel        string // debug, info, warn or error
+	TrustedProxies  []netip.Prefix // proxies whose X-Forwarded-For names the client
+	LogLevel        string         // debug, info, warn or error
 }
 
 // LoadNode reads node configuration through getenv (usually os.Getenv).
@@ -93,7 +94,32 @@ func LoadNode(getenv func(string) string) (Node, error) {
 	if cfg.RateLimitPerMin, err = parsePositiveInt(getenv("RATE_LIMIT_PER_MIN"), 30); err != nil {
 		return cfg, fmt.Errorf("RATE_LIMIT_PER_MIN: %w", err)
 	}
+	if cfg.TrustedProxies, err = parsePrefixes(getenv("TRUSTED_PROXIES")); err != nil {
+		return cfg, fmt.Errorf("TRUSTED_PROXIES: %w", err)
+	}
 	return cfg, nil
+}
+
+// parsePrefixes splits a comma-separated list of IPs and CIDRs.
+func parsePrefixes(s string) ([]netip.Prefix, error) {
+	var out []netip.Prefix
+	for raw := range strings.SplitSeq(s, ",") {
+		raw = strings.TrimSpace(raw)
+		if raw == "" {
+			continue
+		}
+		if ip, err := netip.ParseAddr(raw); err == nil {
+			ip = ip.Unmap()
+			out = append(out, netip.PrefixFrom(ip, ip.BitLen()))
+			continue
+		}
+		p, err := netip.ParsePrefix(raw)
+		if err != nil {
+			return nil, fmt.Errorf("%q is not an IP or CIDR", raw)
+		}
+		out = append(out, p.Masked())
+	}
+	return out, nil
 }
 
 // addrOrOff returns def for an empty value and "" for "off".
