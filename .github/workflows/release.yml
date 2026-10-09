@@ -27,12 +27,33 @@ jobs:
       version: ${{ steps.rp.outputs.version }}
       major: ${{ steps.rp.outputs.major }}
       minor: ${{ steps.rp.outputs.minor }}
+      pr_updated: ${{ steps.rp.outputs.prs_created }}
+      pr: ${{ steps.rp.outputs.pr }}
     steps:
       - id: rp
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
-          # A PAT lets CI run on the release PR; GITHUB_TOKEN-created PRs trigger no workflows.
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  # Pushes and PRs made with GITHUB_TOKEN start no workflows, so the release PR
+  # would never get the checks the main ruleset requires. workflow_dispatch is
+  # exempt from that rule, and its check runs land on the branch head, which is
+  # the release PR's head commit.
+  release-pr-checks:
+    needs: release-please
+    if: needs.release-please.outputs.pr_updated == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Dispatch CI and PR title checks on the release PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          BRANCH: ${{ fromJSON(needs.release-please.outputs.pr).headBranchName }}
+        run: |
+          gh workflow run ci.yml --ref "$BRANCH"
+          gh workflow run pr-title.yml --ref "$BRANCH"
 
   image:
     needs: release-please

@@ -4,13 +4,15 @@ on:
   push:
     branches: [main]
   pull_request:
+  # release.yml dispatches CI on the release PR, which GITHUB_TOKEN cannot trigger.
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: ${{ github.event_name != 'push' }}
 
 jobs:
   lint:
