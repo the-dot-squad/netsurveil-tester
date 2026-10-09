@@ -15,10 +15,11 @@ services:
     restart: unless-stopped
     stop_grace_period: 30s
     ports:
-      - "${NODE_PORT:-8080}:8080"
+      - "${NODE_PORT:-8080}:${NODE_PORT:-8080}"
     environment:
       NODE_ID: ${NODE_ID:-}
       NODE_SECRET: ${NODE_SECRET:-}
+      NODE_PORT: ${NODE_PORT:-8080}
       FEED_URLS: ${FEED_URLS:-}
       HTTP_PATH_PREFIX: ${HTTP_PATH_PREFIX:-}
       RATE_LIMIT_PER_MIN: ${RATE_LIMIT_PER_MIN:-30}

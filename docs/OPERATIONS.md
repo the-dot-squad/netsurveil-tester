@@ -63,7 +63,8 @@ Finally, register the node's address and secret on the website and run an
 |-------------------------|---------|---------|
 | `NODE_ID`               | required | `[A-Za-z0-9._-]{1,64}`; bound into every envelope |
 | `NODE_SECRET`           | required | 32 bytes as 64 hex characters or base64 (`openssl rand -base64 32`) |
-| `LISTEN_ADDR`           | `:8080` | inbound listener; `off` disables direct requests (compose leaves the default and maps it to `NODE_PORT`) |
+| `NODE_PORT`             | `8080`  | port the node listens on for direct requests (compose publishes the same port on the host); `off` disables direct requests |
+| `LISTEN_ADDR`           | empty   | advanced override of `NODE_PORT`, e.g. `127.0.0.1:8080` to bind one interface, or `off`; when set, `NODE_PORT` is ignored by the node |
 | `HEALTH_ADDR`           | `127.0.0.1:8099` | loopback-only health listener used by the image's `HEALTHCHECK`; a loopback `IP:port`, or `off` (the systemd install turns it off) |
 | `HTTP_PATH_PREFIX`      | empty   | e.g. `/k3x9q`; every route lives under it |
 | `FEED_URLS`             | empty   | enables pull mode: up to 8 comma-separated URLs of the node's feed object, used in order as mirrors |
