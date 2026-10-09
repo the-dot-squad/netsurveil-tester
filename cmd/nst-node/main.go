@@ -82,7 +82,7 @@ func run() error {
 	if cfg.ListenAddr != "" {
 		serve(&http.Server{
 			Addr:              cfg.ListenAddr,
-			Handler:           svc.Handler(cfg.PathPrefix, cfg.RateLimitPerMin),
+			Handler:           svc.Handler(cfg.PathPrefix, cfg.RateLimitPerMin, cfg.TrustedProxies),
 			BaseContext:       baseCtx,
 			ReadHeaderTimeout: 5 * time.Second,
 			ReadTimeout:       15 * time.Second,

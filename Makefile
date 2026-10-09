@@ -15,7 +15,7 @@ COVER_MIN ?= 45
 FUZZTIME  ?= 15s
 # package:FuzzFunc pairs run by `make fuzz`.
 FUZZ := internal/envelope:FuzzOpen internal/api:FuzzOpenRequest internal/config:FuzzParseSecret \
-	internal/check:FuzzParseDNSResponse internal/check:FuzzParseQuoted
+	internal/check:FuzzParseDNSResponse internal/check:FuzzParseQuoted internal/ratelimit:FuzzClientIP
 
 .PHONY: build test vet lint vuln cover fuzz ci vectors docker e2e e2e-down clean
 

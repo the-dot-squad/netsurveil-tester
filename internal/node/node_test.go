@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"strings"
 	"sync"
 	"testing"
@@ -66,7 +67,7 @@ func blockingRun(ctx context.Context, s check.Spec) check.Result {
 var forbiddenCheck = check.Spec{Type: "tcp", Target: "127.0.0.1", Options: json.RawMessage(`{"ports":[80]}`)}
 
 func TestDirectRoundTrip(t *testing.T) {
-	srv := httptest.NewServer(newService(t).Handler("/p", 1000))
+	srv := httptest.NewServer(newService(t).Handler("/p", 1000, nil))
 	defer srv.Close()
 	c, err := client.New(client.Config{NodeID: nodeID, Secret: secret, NodeURL: srv.URL + "/p"})
 	if err != nil {
@@ -97,7 +98,7 @@ func TestDirectRoundTrip(t *testing.T) {
 }
 
 func TestDirectBusy(t *testing.T) {
-	srv := httptest.NewServer(newServiceWith(t, blockingRun, jobs.Limits{MaxChecks: 2, CheckConcurrency: 1, MaxActiveJobs: 1, TTL: time.Minute}).Handler("", 1000))
+	srv := httptest.NewServer(newServiceWith(t, blockingRun, jobs.Limits{MaxChecks: 2, CheckConcurrency: 1, MaxActiveJobs: 1, TTL: time.Minute}).Handler("", 1000, nil))
 	defer srv.Close()
 	c, _ := client.New(client.Config{NodeID: nodeID, Secret: secret, NodeURL: srv.URL})
 	ctx := context.Background()
@@ -115,7 +116,7 @@ func TestDirectBusy(t *testing.T) {
 }
 
 func TestRejections(t *testing.T) {
-	srv := httptest.NewServer(newService(t).Handler("", 1000))
+	srv := httptest.NewServer(newService(t).Handler("", 1000, nil))
 	defer srv.Close()
 
 	wrong, _ := client.New(client.Config{NodeID: nodeID, Secret: bytes.Repeat([]byte{8}, 32), NodeURL: srv.URL})
@@ -181,7 +182,7 @@ func TestRejections(t *testing.T) {
 }
 
 func TestNoFingerprint(t *testing.T) {
-	h := newService(t).Handler("/p", 1000)
+	h := newService(t).Handler("/p", 1000, nil)
 	cases := []struct {
 		method, target, remote string
 	}{
@@ -202,17 +203,54 @@ func TestNoFingerprint(t *testing.T) {
 	}
 }
 
-func TestRateLimitLooksLikeNotFound(t *testing.T) {
-	srv := httptest.NewServer(newService(t).Handler("", 2))
+// forwardedFor adds an X-Forwarded-For header, as a reverse proxy would.
+type forwardedFor string
+
+func (f forwardedFor) RoundTrip(r *http.Request) (*http.Response, error) {
+	r = r.Clone(r.Context())
+	r.Header.Set("X-Forwarded-For", string(f))
+	return http.DefaultTransport.RoundTrip(r)
+}
+
+func probe(t *testing.T, url string, rt http.RoundTripper) int {
+	t.Helper()
+	resp, err := (&http.Client{Transport: rt}).Get(url + "/wp-login.php")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	return resp.StatusCode
+}
+
+func TestRateLimitCountsOnlyRejections(t *testing.T) {
+	srv := httptest.NewServer(newService(t).Handler("", 2, nil))
 	defer srv.Close()
 	c, _ := client.New(client.Config{NodeID: nodeID, Secret: secret, NodeURL: srv.URL})
-	var errs []string
-	for range 3 {
-		_, err := c.Status(context.Background(), "nope")
-		errs = append(errs, err.Error())
+	for i := range 5 {
+		if _, err := c.Status(context.Background(), "nope"); err == nil || !strings.Contains(err.Error(), "unknown job") {
+			t.Fatalf("authenticated request %d: %v", i+1, err)
+		}
 	}
-	if !strings.Contains(errs[1], "unknown job") || !strings.Contains(errs[2], "HTTP 404") {
-		t.Fatalf("errors %q", errs)
+	probe(t, srv.URL, nil)
+	probe(t, srv.URL, nil)
+	if _, err := c.Status(context.Background(), "nope"); err == nil || !strings.Contains(err.Error(), "HTTP 404") {
+		t.Fatalf("over the limit, the node must look closed: %v", err)
+	}
+}
+
+func TestRateLimitBehindTrustedProxy(t *testing.T) {
+	trusted := []netip.Prefix{netip.MustParsePrefix("127.0.0.0/8"), netip.MustParsePrefix("::1/128")}
+	srv := httptest.NewServer(newService(t).Handler("", 2, trusted))
+	defer srv.Close()
+	for range 3 {
+		probe(t, srv.URL, forwardedFor("203.0.113.5"))
+	}
+	c, _ := client.New(client.Config{
+		NodeID: nodeID, Secret: secret, NodeURL: srv.URL,
+		HTTPClient: &http.Client{Transport: forwardedFor("198.51.100.1")},
+	})
+	if _, err := c.Status(context.Background(), "nope"); err == nil || !strings.Contains(err.Error(), "unknown job") {
+		t.Fatalf("a scanner behind the same proxy locked out the controller: %v", err)
 	}
 }
 
